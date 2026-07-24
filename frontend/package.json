@@ -1,0 +1,13 @@
+{
+  "name": "nocoffee",
+  "version": "0.5.0",
+  "description": "NoCoffee vision simulator",
+  "main": "background.js",
+  "scripts": {
+    "_comment": "for Linux/macOS: remove 'bash' from 'start:chrome' script, and uncomment corresponding script in launch_chrome.sh",
+    "test": "eslint . && web-ext lint --ignore-files package\\* launch_chrome.sh"
+  },
+  "author": "Moi",
+  "license": "MIT",
+  "devDependencies": {}
+}
