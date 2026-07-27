@@ -59,3 +59,30 @@ button {
   background: #2b5faa;
   color: white;
 }
+
+.mode-selector,
+.difficulty-selector {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mode-selector button,
+.difficulty-selector button {
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #2b5faa;
+  background: white;
+  color: #2b5faa;
+  cursor: pointer;
+}
+
+.mode-selector button.active,
+.difficulty-selector button.active {
+  background: #2b5faa;
+  color: white;
+}
+
+.board.disabled {
+  pointer-events: none;
+  opacity: 0.7;
+}

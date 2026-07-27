@@ -1,77 +1,96 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
+import {
+  createEmptyBoard,
+  dropDisc,
+  checkWinner,
+  isBoardFull,
+  getBestMove
+} from './gameLogic'
 
-const ROWS = 6
-const COLS = 7
+const HUMAN = 'red'
+const AI = 'yellow'
 
-function createEmptyBoard() {
-  return Array.from({ length: ROWS }, () => Array(COLS).fill(null))
-}
-
-function checkWinner(board) {
-  const directions = [
-    [0, 1], [1, 0], [1, 1], [1, -1]
-  ]
-
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const player = board[r][c]
-      if (!player) continue
-
-      for (const [dr, dc] of directions) {
-        let count = 1
-        let rr = r + dr
-        let cc = c + dc
-        while (
-            rr >= 0 && rr < ROWS &&
-            cc >= 0 && cc < COLS &&
-            board[rr][cc] === player
-            ) {
-          count++
-          if (count === 4) return player
-          rr += dr
-          cc += dc
-        }
-      }
-    }
-  }
-  return null
+const DIFFICULTY_DEPTHS = {
+  easy: 2,
+  medium: 4,
+  hard: 6
 }
 
 function App() {
   const [board, setBoard] = useState(createEmptyBoard())
-  const [currentPlayer, setCurrentPlayer] = useState('red')
+  const [currentPlayer, setCurrentPlayer] = useState(HUMAN)
   const [winner, setWinner] = useState(null)
+  const [isDraw, setIsDraw] = useState(false)
+  const [mode, setMode] = useState('pvp') // 'pvp' | 'ai'
+  const [difficulty, setDifficulty] = useState('medium')
+  const [aiThinking, setAiThinking] = useState(false)
 
-  const handleColumnClick = (col) => {
-    if (winner) return
+  const isAiTurn = mode === 'ai' && currentPlayer === AI && !winner && !isDraw
 
-    const newBoard = board.map(row => [...row])
-    let placedRow = -1
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (!newBoard[r][col]) {
-        newBoard[r][col] = currentPlayer
-        placedRow = r
-        break
-      }
-    }
-    if (placedRow === -1) return // colonne pleine
+  const playMove = (col, player) => {
+    const result = dropDisc(board, col, player)
+    if (!result) return false // colonne pleine
 
+    const newBoard = result.board
     setBoard(newBoard)
 
     const win = checkWinner(newBoard)
     if (win) {
       setWinner(win)
       saveScore(win)
-    } else {
-      setCurrentPlayer(currentPlayer === 'red' ? 'yellow' : 'red')
+      return true
     }
+
+    if (isBoardFull(newBoard)) {
+      setIsDraw(true)
+      return true
+    }
+
+    setCurrentPlayer(player === 'red' ? 'yellow' : 'red')
+    return true
   }
+
+  const handleColumnClick = (col) => {
+    if (winner || isDraw) return
+    if (mode === 'ai' && currentPlayer !== HUMAN) return
+    playMove(col, currentPlayer)
+  }
+
+  useEffect(() => {
+    if (!isAiTurn) return
+
+    setAiThinking(true)
+    const timer = setTimeout(() => {
+      const depth = DIFFICULTY_DEPTHS[difficulty]
+      const col = getBestMove(board, AI, depth)
+      if (col !== null && col !== undefined) {
+        playMove(col, AI)
+      }
+      setAiThinking(false)
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, 400)
+
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAiTurn, board])
 
   const resetGame = () => {
     setBoard(createEmptyBoard())
-    setCurrentPlayer('red')
+    setCurrentPlayer(HUMAN)
     setWinner(null)
+    setIsDraw(false)
+    setAiThinking(false)
+  }
+
+  const changeMode = (newMode) => {
+    setMode(newMode)
+    resetGame()
+  }
+
+  const changeDifficulty = (level) => {
+    setDifficulty(level)
+    resetGame()
   }
 
   const saveScore = async (player) => {
@@ -79,24 +98,69 @@ function App() {
       await fetch('/api/scores', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ winner: player, date: new Date().toISOString() })
+        body: JSON.stringify({
+          winner: player,
+          mode,
+          difficulty: mode === 'ai' ? difficulty : null,
+          date: new Date().toISOString()
+        })
       })
     } catch (e) {
-      console.warn('Impossible d\'enregistrer le score', e)
+      console.warn("Impossible d'enregistrer le score", e)
     }
+  }
+
+  const playerLabel = (player) => {
+    if (mode === 'ai') {
+      return player === HUMAN ? 'Toi' : 'IA'
+    }
+    return player === 'red' ? 'Rouge' : 'Jaune'
   }
 
   return (
       <div className="app">
         <h1>Puissance 4</h1>
 
-        {winner ? (
-            <p className="status">🎉 {winner === 'red' ? 'Rouge' : 'Jaune'} a gagné !</p>
-        ) : (
-            <p className="status">Au tour de : {currentPlayer === 'red' ? 'Rouge' : 'Jaune'}</p>
+        <div className="mode-selector">
+          <button
+              className={mode === 'pvp' ? 'active' : ''}
+              onClick={() => changeMode('pvp')}
+          >
+            2 joueurs
+          </button>
+          <button
+              className={mode === 'ai' ? 'active' : ''}
+              onClick={() => changeMode('ai')}
+          >
+            Solo vs IA
+          </button>
+        </div>
+
+        {mode === 'ai' && (
+            <div className="difficulty-selector">
+              {Object.keys(DIFFICULTY_DEPTHS).map((level) => (
+                  <button
+                      key={level}
+                      className={difficulty === level ? 'active' : ''}
+                      onClick={() => changeDifficulty(level)}
+                  >
+                    {level === 'easy' ? 'Facile' : level === 'medium' ? 'Moyen' : 'Difficile'}
+                  </button>
+              ))}
+            </div>
         )}
 
-        <div className="board">
+        {winner ? (
+            <p className="status">🎉 {playerLabel(winner)} a gagné !</p>
+        ) : isDraw ? (
+            <p className="status">Match nul !</p>
+        ) : (
+            <p className="status">
+              {aiThinking ? "L'IA réfléchit..." : `Au tour de : ${playerLabel(currentPlayer)}`}
+            </p>
+        )}
+
+        <div className={`board ${aiThinking ? 'disabled' : ''}`}>
           {board.map((row, r) => (
               <div className="row" key={r}>
                 {row.map((cell, c) => (
