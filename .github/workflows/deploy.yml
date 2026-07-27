@@ -42,6 +42,8 @@ jobs:
       - name: Whitelist runner IP on O2switch
         run: |
           curl -sm 45 -u "${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_PASSWORD }}" \
+            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove_all"
+          curl -sm 45 -u "${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_PASSWORD }}" \
             "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22"
 
       - name: Deploy frontend via rsync/SSH
