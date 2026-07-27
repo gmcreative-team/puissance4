@@ -35,6 +35,15 @@ jobs:
         run: composer install --no-dev --optimize-autoloader
         if: hashFiles('backend/composer.json') != ''
 
+      - name: Get runner's public IP
+        id: ip
+        uses: haythem/public-ip@v1.3
+
+      - name: Whitelist runner IP on O2switch
+        run: |
+          curl -sm 45 -u "${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_PASSWORD }}" \
+            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22"
+
       - name: Deploy frontend via rsync/SSH
         uses: easingthemes/ssh-deploy@main
         with:
@@ -56,3 +65,9 @@ jobs:
           SOURCE: "backend/"
           TARGET: "${{ secrets.DEPLOY_PATH }}/api/"
           ARGS: "-avz --delete --exclude='.env'"
+
+      - name: Remove whitelisted IP after deploy
+        if: always()
+        run: |
+          curl -sm 45 -u "${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_PASSWORD }}" \
+            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove_all"
